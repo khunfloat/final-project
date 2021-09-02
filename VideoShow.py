@@ -11,6 +11,7 @@ class VideoShow:
         self.stopped = False
 
     def start(self):
+        # start cv2.imshow's thread  
         Thread(target=self.show, args=()).start()
         return self
 
