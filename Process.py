@@ -105,15 +105,21 @@ class Cache():
 class Image():
     
     # init variables.
-    def __init__(self, frame):
+    def __init__(self, frame, depth_frame):
         self.frame = frame
+        self.init_depth = 440 #mm units
+        self.depth_frame = depth_frame
         self.decoded_qr = decode(self.frame, symbols=[ZBarSymbol.QRCODE])
         self.qrlist = self.findqr()
         self.boxlist = self.findbox()
         
+    # get depth from get_depth_frame
+    def get_depth(self, point):
+        return (self.init_depth - float(self.depth_frame[(int(point[1]), int(point[0]))])) / 10
+        
     # find qrcode in frame.
     def findqr(self):
-        
+
         qrlist = []
         for qr in self.decoded_qr:
             pts = np.array([qr.polygon], np.int32)

@@ -21,18 +21,19 @@ def QRisinBox(box, qr):
     
     # check if (min box.x < qr.x < max box.x) and (min box.y < qr.y < max box.y)
     qrpt, boxpt = [item[0] for item in qr.get('pts')], box.get('pts')
-
+    
+    # zip coordinate to list of x and y
     qrzip, boxzip = tuple(zip(qrpt[0], qrpt[1], qrpt[2], qrpt[3])), tuple(zip(boxpt[0], boxpt[1], boxpt[2], boxpt[3]))
 
-    # x
+    # Get min and max value of x.
     minx, maxx = min(boxzip[0]), max(boxzip[0])
 
-    # y
+    # Get min and max value of y.
     miny, maxy = min(boxzip[1]), max(boxzip[1])
-
+    
+    # return true if all of qrcode's point is in range of min, max of x and y
     if all(x in range(minx, maxx) for x in qrzip[0]) and all(y in range(miny, maxy) for y in qrzip[1]):
         return True
-
     else:
         return False
     
@@ -62,16 +63,14 @@ def main(source = 0):
             break
         
         # init frame as object
-        image = Image(video_getter.color_frame)
+        image = Image(video_getter.color_frame, video_getter.depth_frame)
 
         # for loop for mactching qrcode and box
         for qr in image.qrlist:
             for box in image.boxlist:
+                
                 # check qr is in the box
                 if QRisinBox(box, qr):
-                    
-                    # remove box that already used by this qrcode for a next round serching performance
-                    # image.boxlist.remove(box)
                     
                     # init qrcode to an object and pass parameters with id and cache for append to cache
                     package = Package(qr, box, cache)
@@ -86,7 +85,9 @@ def main(source = 0):
                         
                         # get a width and height of the box and round it to decimal point.
                         width, height = package.BOXwidth * ratio, package.BOXheight * ratio
-                        width, height, depth, weight = round(width,2), round(height,2), 0, 0
+                        width, height, depth, weight = round(width,2), round(height,2), image.get_depth(package.QRpts[0][0]), 0
+                        
+                        print(width, height, depth, weight)
 
                         # draw the rectangle around the box and qrcode
                         cv2.polylines(image.frame, [package.QRpts], True, (255, 0 ,0), 3)
@@ -101,6 +102,7 @@ def main(source = 0):
                         
                     # qrcode is not activated
                     elif package.NotActivated: 
+                        
                         # draw rectangle around qrcode and put status text
                         cv2.polylines(image.frame, [package.QRpts], True, (255, 0 ,0), 3)
                         cv2.polylines(image.frame, [package.BOXpts], True, (0, 111 ,111), 3) 
