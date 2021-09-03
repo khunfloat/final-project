@@ -6,6 +6,8 @@ from firebase_admin import credentials
 from firebase_admin import firestore
 from pathlib import Path
 from threading import Thread
+from HomogeneousBgDetector import HomogeneousBgDetector
+from math import dist
 
 # define the collection of firestore
 collection = 'PackageInformation'
@@ -25,11 +27,22 @@ db = firestore.client()
 # Package Class for store the information for each package
 class Package():
     
-    def __init__(self, id, cache):
+    def __init__(self, qr, box, cache):
         
         # init variables
-        self.id = id
+        self.id = qr.get('id')
         self.cache = cache
+        
+        # qrcode position
+        self.QRpts = qr.get('pts')
+        self.QRwidth = int((dist(self.QRpts[0][0], self.QRpts[1][0]) + dist(self.QRpts[2][0], self.QRpts[3][0])) / 2)
+        self.QRheight = int((dist(self.QRpts[1][0], self.QRpts[2][0]) + dist(self.QRpts[0][0], self.QRpts[3][0])) / 2)
+        
+        # box position
+        self.BOXpts = box.get('pts')
+        self.BOXwidth = int((dist(self.BOXpts[0], self.BOXpts[1]) + dist(self.BOXpts[2], self.BOXpts[3])) / 2)
+        self.BOXheight = int((dist(self.BOXpts[1], self.BOXpts[2]) + dist(self.BOXpts[0], self.BOXpts[3])) / 2)
+        
         
         # Find the qr id in cache. if cache doesn't have it. it will get the data by query the database.
         data = next((item for item in self.cache.cache if item["id"] == self.id), None)
@@ -103,21 +116,21 @@ class Image():
         
         qrlist = []
         for qr in self.decoded_qr:
-            pts = np.array([qr.polygon], np.int32).reshape((-1, 1, 2))
-            qrlist.append({'id' : qr.data.decode('utf-8'),
-                            'topleftpoint' : tuple(pts[0][0]),
-                            'bottomrightpoint' : tuple(pts[2][0])});
+            pts = np.array([qr.polygon], np.int32)
+            pts = pts.reshape((-1, 1, 2))
+            qrlist.append({ 'id' : qr.data.decode('utf-8'),
+                            'pts' : pts})
         return qrlist
     
     # find box in frame.
     def findbox(self):
         
+        detector = HomogeneousBgDetector()
+        
         boxlist = []
-        gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-        _, threshold = cv2.threshold(gray, 127, 255, cv2.THRESH_TOZERO)
-        contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = detector.detect_objects(self.frame)
         for cnt in contours:
             rect = cv2.minAreaRect(cnt)
-            box = np.int0(cv2.boxPoints(rect))
-            boxlist.append({'topleftpoint' : tuple(box[0]), 'bottomrightpoint' : tuple(box[2])})     
+            pts = np.int0(cv2.boxPoints(rect))
+            boxlist.append({'pts' : pts})     
         return boxlist
