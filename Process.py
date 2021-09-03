@@ -60,14 +60,17 @@ class Package():
         self.IsActivatedNotRegistered = self.activation and (not self.registeration)
         self.IsAddDimension = self.dimension_status
         
-    # function for add the dimension to database 
+    # Start _writedimention thread
     def AddDimension(self, width, height, depth, weight):
+        Thread(target=self._writedimention, args=(width, height, depth, weight)).start()
         
-        db.collection(collection).document(self.id).set({'dimension_status' : True,
-                                                        'height' : height, 
-                                                        'width' : width,
-                                                        'depth' : depth,
-                                                        'weight' : weight}, merge=True)
+    # function for add the dimension to database 
+    def _writedimention(self, width, height, depth, weight):
+        db.collection(collection).document(self.id).set({   'dimension_status' : True,
+                                                            'height' : height, 
+                                                            'width' : width,
+                                                            'depth' : depth,
+                                                            'weight' : weight   }, merge=True)
 
 # Cache Class create cache for the package class to get the data if it exists in the cache. for the faster performance
 class Cache():
@@ -118,88 +121,3 @@ class Image():
             box = np.int0(cv2.boxPoints(rect))
             boxlist.append({'topleftpoint' : tuple(box[0]), 'bottomrightpoint' : tuple(box[2])})     
         return boxlist
-    
-    # check that qrcode is in the box
-    def QRisinBox(self, box, qr):
-        
-        # check if (min box.x < qr.x < max box.x) and (min box.y < qr.y < max box.y)
-        if (box.get('topleftpoint')[0] < qr.get('topleftpoint')[0] < box.get('bottomrightpoint')[0]) and (box.get('topleftpoint')[1] < qr.get('topleftpoint')[1] < box.get('bottomrightpoint')[1]):
-            return True
-        else:
-            return False
-
-class Process():
-    
-    def __init__(self, frame):
-        self.qrlist = []
-        self.boxlist = []
-        self.frame = frame
-        self.decoded_qr = decode(frame)
-        
-    def findqr(self):
-
-        for qr in self.decoded_qr:
-            pts = np.array([qr.polygon], np.int32).reshape((-1, 1, 2))
-            self.qrlist.append({'id' : qr.data.decode('utf-8'),
-                                'topleftpoint' : tuple(pts[0][0]),
-                                'bottomrightpoint' : tuple(pts[2][0])});
-
-    def findbox(self):
-        
-        gray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-        _, threshold = cv2.threshold(gray, 127, 255, cv2.THRESH_TOZERO)
-        contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-        for cnt in contours:
-            rect = cv2.minAreaRect(cnt)
-
-            box = np.int0(cv2.boxPoints(rect))
-            self.boxlist.append({'topleftpoint' : tuple(box[0]), 'bottomrightpoint' : tuple(box[2])})
-            
-    def matching(self):
-        
-        self.findqr()
-        
-        self.findbox()
-
-        for qr in self.qrlist:
-            for box in self.boxlist:
-                if (box.get('topleftpoint')[0] < qr.get('topleftpoint')[0] < box.get('bottomrightpoint')[0]) and (box.get('topleftpoint')[1] < qr.get('topleftpoint')[1] < box.get('bottomrightpoint')[1]):
-                    
-                    self.boxlist.remove(box)
-                    
-                    qrcode = Package(qr.get('id'))
-                    
-                    if qrcode.IsActivatedIsRegistered:
-
-                        dimension = ((qr.get('bottomrightpoint')[0] - qr.get('topleftpoint')[0]) + (qr.get('bottomrightpoint')[1] - qr.get('topleftpoint')[1])) / 2
-                        ratio = 5 / dimension
-                        
-                        width, height = (box.get('bottomrightpoint')[0] - box.get('topleftpoint')[0]) * ratio, (box.get('bottomrightpoint')[1] - box.get('topleftpoint')[1]) * ratio
-                        width, height, depth, weight = round(width,2), round(height,2), 0, 0
-
-                        cv2.rectangle(self.frame, box.get('topleftpoint'), box.get('bottomrightpoint'), (0, 200, 200), 2)
-                        cv2.rectangle(self.frame, qr.get('topleftpoint'), qr.get('bottomrightpoint'), (0, 0, 200), 2)
-                        
-                        cv2.putText(self.frame, f"id: {qr.get('id')}", (box.get('topleftpoint')[0], box.get('topleftpoint')[1]), cv2.FONT_HERSHEY_PLAIN, 1, (100, 200, 0), 2)
-                        cv2.putText(self.frame, f"width: {width}, height: {height}", (box.get('topleftpoint')[0], box.get('topleftpoint')[1] + 35), cv2.FONT_HERSHEY_PLAIN, 1, (100, 200, 0), 2)
-
-                        qrcode.AddDimension(width, height, depth, weight)
-
-                    elif qrcode.NotActivated: 
-                        cv2.rectangle(self.frame, qr.get('topleftpoint'), qr.get('bottomrightpoint'), (222, 0, 0), 2)
-                        cv2.putText(self.frame, f"Isn't activated", (box.get('topleftpoint')[0], box.get('topleftpoint')[1]), cv2.FONT_HERSHEY_PLAIN, 1, (100, 200, 0), 2)
-                        
-                    elif qrcode.IsActivatedIsRegistered:
-                        cv2.rectangle(self.frame, qr.get('topleftpoint'), qr.get('bottomrightpoint'), (222, 0, 0), 2)
-                        cv2.putText(self.frame, f"Isn't Registered", (box.get('topleftpoint')[0], box.get('topleftpoint')[1]), cv2.FONT_HERSHEY_PLAIN, 1, (100, 200, 0), 2)
-                    
-                    elif qrcode.IsAddDimension:
-                        cv2.rectangle(self.frame, qr.get('topleftpoint'), qr.get('bottomrightpoint'), (222, 0, 0), 2)
-                        cv2.putText(self.frame, f"Is added dimension", (box.get('topleftpoint')[0], box.get('topleftpoint')[1]), cv2.FONT_HERSHEY_PLAIN, 1, (100, 200, 0), 2)
-                        
-                    break
-                
-    def start(self):
-        Thread(target=self.matching, args=()).start()
-        return self

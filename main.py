@@ -3,7 +3,7 @@ import numpy
 from CountsPerSec import CountsPerSec
 from VideoGet import VideoGet
 from VideoShow import VideoShow
-from Process import *
+from Process import Package, Image, Cache
 
 # Initialize cache for contain QRcode query data
 cache = Cache()
@@ -15,6 +15,15 @@ def putIterationsPerSec(frame, iterations_per_sec):
     """
     cv2.putText(frame, "{:.0f} iterations/sec".format(iterations_per_sec), (10, 450), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255))
     return frame
+
+# check that qrcode is in the box
+def QRisinBox(box, qr):
+    
+    # check if (min box.x < qr.x < max box.x) and (min box.y < qr.y < max box.y)
+    if (box.get('topleftpoint')[0] < qr.get('topleftpoint')[0] < box.get('bottomrightpoint')[0]) and (box.get('topleftpoint')[1] < qr.get('topleftpoint')[1] < box.get('bottomrightpoint')[1]):
+        return True
+    else:
+        return False
 
 # main function
 def main(source = 0):
@@ -42,7 +51,7 @@ def main(source = 0):
         for qr in image.qrlist:
             for box in image.boxlist:
                 # check qr is in the box
-                if image.QRisinBox(box, qr):
+                if QRisinBox(box, qr):
                     
                     # remove box that already used by this qrcode for a next round serching performance
                     image.boxlist.remove(box)
